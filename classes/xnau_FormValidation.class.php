@@ -390,13 +390,14 @@ class xnau_FormValidation {
    * @param string $string the string to test
    * @return bool
    */
-  public static function is_regex($string)
+  public static function is_regex($regex)
   {
 
-    if (!is_string($string) || strlen($string) === 0)
+    if (!is_string($regex) || strlen($regex) === 0)
       return false;
-
-    return @preg_match($string,'test string') !== false;
+    if(strpos('/#', $regex[0]) === false) $regex = '/'.$regex;
+    if(strpos('/#', substr($regex,-1)) === false) $regex = $regex.'/';
+    return @preg_match($regex,'test string') !== false;
   }
 
   /**
