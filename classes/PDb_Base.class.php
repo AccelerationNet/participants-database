@@ -470,7 +470,7 @@ class PDb_Base {
     
     $role = $role === 'admin' ? 'plugin_admin_capability' : 'record_edit_capability';
     
-    return current_user_can(self::plugin_capability(self::plugin_setting($role), $context));
+    return current_user_can(self::plugin_capability($role, $context));
   }
   
   /**
