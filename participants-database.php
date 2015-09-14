@@ -2244,7 +2244,8 @@ class Participants_Db extends PDb_Base {
          * if we are submitting from the frontend, set the feedback message and 
          * send the update notification
          */
-        if (!is_admin()) {
+        
+        if (!current_user_can('edit_others_posts')) {
 
           /*
            * if the user is an admin, the validation object won't be instantiated, 
