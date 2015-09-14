@@ -31,6 +31,12 @@
 if (!defined( 'ABSPATH' ) ) exit;
 // register the class autoloading
 spl_autoload_register('PDb_class_loader');
+
+function wpdb_is_admin_user(){
+    return current_user_can(
+        self::plugin_capability(
+            'plugin_admin_capability', 'access admin field groups'));
+}
 /**
  * main static class for running the plugin
  * 
@@ -51,7 +57,6 @@ class Participants_Db extends PDb_Base {
    * @var string unique slug for the plugin
    */
   const PLUGIN_NAME = 'participants-database';
-
   /**
    *  display title
    * @var string
@@ -1046,7 +1051,7 @@ class Participants_Db extends PDb_Base {
     }
     if (is_array($fields)) {
       $where_clauses[] = 'f.name IN ("' . implode('","',$fields) . '")';
-    } elseif (! is_admin()) {
+    } elseif (! wpdb_is_admin_user() ) {
       $where_clauses[] = 'f.display_column > 0 ';
     }
     
@@ -1237,7 +1242,7 @@ class Participants_Db extends PDb_Base {
       case 'backend':
 
           $where = 'WHERE v.name <> "id" AND v.form_element <> "captcha" AND v.form_element <> "placeholder"';
-        if (!current_user_can(self::plugin_capability('plugin_admin_capability', 'access admin field groups'))) {
+        if (!wpdb_is_admin_user()) {
           // don't show non-displaying groups to non-admin users
           $where .= 'AND g.admin = 0';
         }
@@ -1643,7 +1648,7 @@ class Participants_Db extends PDb_Base {
             case 'file-upload':
               
               if (filter_input(INPUT_POST, $column->name . '-deletefile', FILTER_SANITIZE_STRING) === 'delete') {
-                if (self::$plugin_options['file_delete'] == 1 or is_admin() ) {
+                if (self::$plugin_options['file_delete'] == 1 or wpdb_is_admin_user() ) {
                   self::delete_file($post[$column->name]);
                 }
                 unset($_POST[$column->name]);
@@ -2241,11 +2246,11 @@ class Participants_Db extends PDb_Base {
         do_action($wp_hook,self::get_participant($participant_id));
 
         /*
-         * if we are submitting from the frontend, set the feedback message and 
+         * if we are a non admin user submitting, set the feedback message and 
          * send the update notification
          */
         
-        if (!current_user_can('edit_others_posts')) {
+        if (!wpdb_is_admin_user()) {
 
           /*
            * if the user is an admin, the validation object won't be instantiated, 
