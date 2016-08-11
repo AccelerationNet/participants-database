@@ -171,8 +171,9 @@ class PDb_FormValidation extends xnau_FormValidation {
           break;
 
         case ( self::is_regex( $field->validation ) ) :
-
           $regex = $field->validation;
+          if(strpos('/#', $regex[0]) === false) $regex = '/'.$regex;
+          if(strpos('/#', substr($regex,-1)) === false) $regex = $regex.'/';
           break;
 
         /*

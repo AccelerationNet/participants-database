@@ -546,11 +546,9 @@ class PDb_Base {
    * 
    * @return bool true if current user has the role tested
    */
-  public static function current_user_has_plugin_role( $role = 'editor', $context = '' )
-  {
+  public static function current_user_has_plugin_role( $role = 'editor', $context = '' )  {
 
     $role = $role === 'admin' ? 'plugin_admin_capability' : 'record_edit_capability';
-
     return current_user_can( self::plugin_capability( $role, $context ) );
   }
 

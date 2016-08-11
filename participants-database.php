@@ -33,7 +33,14 @@
 if ( !defined( 'ABSPATH' ) )
   exit;
 // register the class autoloading
-spl_autoload_register( 'PDb_class_loader' );
+
+spl_autoload_register('PDb_class_loader');
+
+function wpdb_is_admin_user(){
+    return current_user_can(
+        Participants_Db::plugin_capability(
+            'plugin_admin_capability', 'access admin field groups'));
+}
 
 /**
  * main static class for running the plugin
@@ -60,7 +67,6 @@ class Participants_Db extends PDb_Base {
    * @var string unique slug for the plugin
    */
   const PLUGIN_NAME = 'participants-database';
-
   /**
    * @var string name of the single record query var
    */
@@ -1048,7 +1054,8 @@ class Participants_Db extends PDb_Base {
     }
     if ( is_array( $fields ) ) {
       $where_clauses[] = 'f.name IN ("' . implode( '","', $fields ) . '")';
-    } elseif ( !is_admin() ) {
+    } elseif (! wpdb_is_admin_user() ) { //>>>> 8jcba
+
       $where_clauses[] = 'f.display_column > 0 ';
     }
 
@@ -1243,11 +1250,12 @@ class Participants_Db extends PDb_Base {
         case 'backend':
 
           $where = 'WHERE v.name <> "id" AND v.form_element <> "captcha" AND v.form_element <> "placeholder"';
-          if ( !current_user_can( self::plugin_capability( 'plugin_admin_capability', 'access admin field groups' ) ) ) {
-            // don't show non-displaying groups to non-admin users
-            $where .= 'AND g.admin = 0';
-          }
-          break;
+        if (!wpdb_is_admin_user()) {
+          // don't show non-displaying groups to non-admin users
+          $where .= 'AND g.admin = 0';
+        }
+        break;
+
 
         case 'new':
         default:
@@ -1705,10 +1713,10 @@ class Participants_Db extends PDb_Base {
 
             case 'image-upload':
             case 'file-upload':
-
-              if ( filter_input( INPUT_POST, $column->name . '-deletefile', FILTER_SANITIZE_STRING ) === 'delete' ) {
-                if ( self::$plugin_options['file_delete'] == 1 or is_admin() ) {
-                  self::delete_file( $post[$column->name] );
+           
+              if (filter_input(INPUT_POST, $column->name . '-deletefile', FILTER_SANITIZE_STRING) === 'delete') {
+                if (self::$plugin_options['file_delete'] == 1 or wpdb_is_admin_user() ) {
+                  self::delete_file($post[$column->name]);
                 }
                 unset( $_POST[$column->name] );
                 $post[$column->name] = '';
@@ -2353,11 +2361,10 @@ class Participants_Db extends PDb_Base {
         do_action( $wp_hook, self::get_participant( $participant_id ) );
 
         /*
-         * if we are submitting from the frontend, set the feedback message and 
+         * if we are a non admin user submitting, set the feedback message and 
          * send the update notification
          */
-        if ( !is_admin() ) {
-
+        if (!wpdb_is_admin_user()) {
           /*
            * if the user is an admin, the validation object won't be instantiated, 
            * so we do that here so the feedback message can be shown.
@@ -2367,7 +2374,9 @@ class Participants_Db extends PDb_Base {
 
           self::$validation_errors->add_error( '', self::$plugin_options['record_updated_message'] );
 
+          //echo "!!! ".(self::$plugin_options['send_record_update_notify_email'] ? "Y" : "N")."-".(Participants_Db::$session->get('form_status') !== 'multipage'?"Y":"N")." ".self::$plugin_options['email_signup_notify_addresses'];die();
           if ( self::$plugin_options['send_record_update_notify_email'] && !self::is_multipage_form() ) {
+ 
 
             PDb_Template_Email::send( array(
                 'to' => self::plugin_setting( 'email_signup_notify_addresses' ),
