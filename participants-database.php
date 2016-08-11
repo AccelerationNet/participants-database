@@ -34,7 +34,7 @@ spl_autoload_register('PDb_class_loader');
 
 function wpdb_is_admin_user(){
     return current_user_can(
-        self::plugin_capability(
+        Participants_Db::plugin_capability(
             'plugin_admin_capability', 'access admin field groups'));
 }
 /**
@@ -2260,6 +2260,7 @@ class Participants_Db extends PDb_Base {
             
           self::$validation_errors->add_error('', self::$plugin_options['record_updated_message']);
 
+          //echo "!!! ".(self::$plugin_options['send_record_update_notify_email'] ? "Y" : "N")."-".(Participants_Db::$session->get('form_status') !== 'multipage'?"Y":"N")." ".self::$plugin_options['email_signup_notify_addresses'];die();
           if (self::$plugin_options['send_record_update_notify_email'] && Participants_Db::$session->get('form_status') !== 'multipage') {
 
             $sent = wp_mail(
