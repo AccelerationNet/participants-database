@@ -1,10 +1,10 @@
 === Participants Database ===
 Contributors: xnau
-Donate link: http://xnau.com/wordpress-plugins/participants-database
+Donate link: https://xnau.com/wordpress-plugins/participants-database
 Tags: supporter, member, volunteer, database, sign up form, survey, management, non-profit, political, community, organization, mailing list, team, records
 Requires at least: 4.0
-Tested up to: 4.2.2
-Stable tag: 1.6.2.5
+Tested up to: 4.5.3
+Stable tag: 1.7.0.3
 License: GPLv2
 
 Build and maintain a fully customizable database of participants, members or anything with signup forms, admin backend, custom lists, and CSV support.
@@ -99,7 +99,7 @@ This plugin is fully compliant with WordPress Internationalization standards and
 
 * Romanian: Cornelia Năescu
 
-* Ukranian: Michael Yunat, [http://getvoip.com/blog](http://getvoip.com)
+* Ukranian: Michael Yunat, [getvoip.com](http://getvoip.com/blog)
 
 * Spanish: Cristhofer Chávez
 
@@ -107,11 +107,19 @@ This plugin is fully compliant with WordPress Internationalization standards and
 
 * Danish: Bo Hejberg Nielsen
 
+* Estonian: Laura Vunk
+
+* Belarusian: Natasha Dyatko [UStarCash](https://www.ustarcash.com)
+
 If you are multi-lingual and feel like contributing a translation, please contact me at: support@xnau.com.
 
 Please note that several of these translations are out of date. If your language is in this list and you'd like to help me provide the latest translation, please contact me.
 
-The latest POT file is always available [here.](http://plugins.svn.wordpress.org/participants-database/trunk/participants-database.pot)
+The latest POT file is always [available here.](http://plugins.svn.wordpress.org/participants-database/trunk/participants-database.pot)
+
+= Key Image Credit =
+
+Sala_macchina_del_Cineca_1971 By Tukulti65 - Own work, CC BY-SA 4.0, https://commons.wikimedia.org/w/index.php?curid=47436569
 
 == Installation ==
 
@@ -254,8 +262,73 @@ You can define a "captcha" form element which will show a simple math question f
 
 == Changelog ==
 
-= 1.6.2.6 =
-fixed problem with multipage signup forms not sending correct notifications
+= 1.7.0.4 =
+* bugfix restores missing settings submit button
+
+= 1.7.0.3 =
+* fixed issue where the private ID was not saved if the user wasn't logged in #1303
+* added setting to suppress scroll anchors (fragments) in pagination links #1298
+* fixed list query error with multiple search terms #1302
+* allow dropdowns and other single-value fields to be used as the primary email address #1301
+
+= 1.7.0.2 =
+* Fixed issue where default email headers were used instead of the plugin settings #1296
+* fixed bug where the CSS error maker for a match field wasn't cleared when the field value is a match #1293
+
+= 1.7.0.1 =
+* fixed data-offset bug in admin list #1289
+* fixed CSV timestamp import bug #1292
+* fixed non-working single_record_link attribute in list shortcode #1291
+* fixed bug in template class that made stored values unavailable in some contexts #1287
+
+= 1.7 =
+* adds numeric field type
+* adds support for add-on plugins
+* refactoring and standardization of email-related code
+* refactoring of all date-related code
+* Further adjustments to time rendering to compensate for difference between server and local time
+* added pdb-shortcode_present hook, several other useful hooks and filters
+* all display strings are passed though a gettext call, but only if the global PDB_MULTILINGUAL is set to true
+* plugin cleans up it's own transients and options
+* alternate directory structures are now supported automatically
+* improved messaging on setting up upload preferences
+* enforced minimum PHP version 5.3
+* single and record query var names are now user-alterable
+* improved date parsing
+* fully implemented template email class
+* aux plugin update support
+* list shortcode filter values can use & | reserved characters
+* added support for 'search_fields' list shortcode attribute
+* image data caching for better performance
+* added API filter to rich text processor
+* API filter for multiple field matches on new records
+* API filter pdb-captcha_validation
+* API filter pdb-before_admin_delete_record triggered on record delete
+* added 'pdb-initialized' hook for use by aux plugins
+* replaced use of get_currentuserinfo()
+
+= 1.6.2.8 =
+* fixes broken AJAX search on some systems
+* valid timezone setting is enforced
+* prevents activation if PHP version is less than 5.3
+* several minor bug fixes 
+
+= 1.6.2.7.1 =
+fixes bug where list pagination drops search
+
+= 1.6.2.7 =
+bug fixes:
+* field/groups deletions in some translated versions
+* email sending with multi-page signup forms
+* showing time with timestamps in the admin
+* otherselect when more than on per form
+* dynamic fields getting re-set in record edit form
+* strict search setting 
+
+new:
+* added "multi-dropdown" form element
+* several efficiency optimizations, wider use of data caches
+* allow use of "simple" multi-field frontend searches
 
 = 1.6.2.5 =
 fixed issue where remote search controls weren't targeting the correct list instance
@@ -549,9 +622,8 @@ Taking defensive precautions against other plugins in the admin:
 
 == Upgrade Notice ==
 
-= 1.6.2.6 =
-
-Version 1.6.2.6 is a bug fix update addressing a problem with multi page signup forms. Don't bother updating if you're not experiencing this issue.
+= 1.7.0.4 =
+Version 1.7.0.4 is an important bugfix release for all users
 
 == Using the Plugin ==
 

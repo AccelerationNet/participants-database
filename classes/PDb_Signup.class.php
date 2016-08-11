@@ -9,7 +9,7 @@
  * @author     Roland Barker <webdeign@xnau.com>
  * @copyright  2015 xnau webdesign
  * @license    GPL2
- * @version    0.8
+ * @version    1.0
  * @link       http://xnau.com/wordpress-plugins/
  * @depends    xnau_FormElement class, Shortcode class
  */
@@ -117,19 +117,22 @@ class PDb_Signup extends PDb_Shortcode {
        * if we've opened a regular signup form while in a multipage session, treat it 
        * as a normal signup form and terminate the multipage session
        */
-    if ($shortcode_atts['module'] === 'signup' && $this->participant_id !== false && !isset($shortcode_atts['action']) && $form_status === 'multipage') {
+    if ($shortcode_atts['module'] === 'signup' && $this->participant_id !== false && !isset($shortcode_atts['action']) && Participants_Db::is_multipage_form()) {
       $this->participant_id = false;
+      $this->_clear_multipage_session();
+      $this->_clear_captcha_session();
+    } elseif ( $shortcode_atts['module'] === 'signup' && $this->participant_id === false ) {
       $this->_clear_multipage_session();
     }
     /*
      * if no ID is set, no submission has been received
      */
     if ($this->participant_id === false) {
-    if (filter_input(INPUT_GET, 'm') === 'r' || $shortcode_atts['module'] == 'retrieve') {
-      /*
-       * we're proceesing a link retrieve request
-       */
-      $shortcode_atts['module'] = 'retrieve';
+    	if (filter_input(INPUT_GET, 'm') === 'r' || $shortcode_atts['module'] == 'retrieve') {
+	      /*
+	       * we're proceesing a link retrieve request
+	       */
+	      $shortcode_atts['module'] = 'retrieve';
         add_filter('pdb-before_field_added_to_iterator', array($this, 'allow_readonly_fields_in_form'));
       }
       if ($shortcode_atts['module'] == 'signup') {
@@ -147,11 +150,10 @@ class PDb_Signup extends PDb_Shortcode {
        */
       $this->participant_values = Participants_Db::get_participant($this->participant_id);
       
-      if ($this->participant_values && ($form_status === 'normal' || ($shortcode_atts['module'] == 'thanks' && $form_status === 'multipage'))) {
+      if ($this->participant_values && ($form_status === 'normal' || ($shortcode_atts['module'] == 'thanks' && Participants_Db::is_multipage_form()))) {
         /*
-         * the submission is successful, clear the session and set the submitted flag
+         * the submission (single or multi-page) is successful, set the submitted flag
        */
-        $this->_clear_multipage_session();
         $this->submitted = true;
         $shortcode_atts['module'] = 'thanks';
       }
@@ -186,13 +188,13 @@ class PDb_Signup extends PDb_Shortcode {
           $signup_feedback->$prop = &$this->$prop;
         }
 
-        apply_filters(Participants_Db::$prefix . 'before_signup_thanks', $signup_feedback);
+        apply_filters(Participants_Db::$prefix . 'before_signup_thanks', $signup_feedback, $this->get_form_status());
       }
 
-        $this->_send_email();
+      $this->_send_email();
 
-      // form has been submitted, close it
-      Participants_Db::$session->clear('form_status');
+      $this->_clear_multipage_session();
+      $this->_clear_captcha_session();
       
     }
     
@@ -266,19 +268,30 @@ class PDb_Signup extends PDb_Shortcode {
   protected function _set_submission_page()
   {
 
-    $form_status = 'normal';
+    $form_status = $this->get_form_status();
+    $this->submission_page = false;
+    /*
+     * check for the "action" attribute
+     */
     if (!empty($this->shortcode_atts['action'])) {
       $this->submission_page = Participants_Db::find_permalink($this->shortcode_atts['action']);
       if ($this->submission_page !== false) {
-        $form_status = 'multipage';
+        $form_status = 'multipage-signup';
       }
     }
+    /*
+     * action attribute is not set in the shortcode, use the global setting
+     */
     if (!$this->submission_page) {
       if (Participants_Db::plugin_setting('signup_thanks_page', 'none') != 'none') { 
-      $this->submission_page = get_permalink(Participants_Db::plugin_setting('signup_thanks_page'));
+      	$this->submission_page = get_permalink(Participants_Db::plugin_setting('signup_thanks_page'));
       }
     }
-    if (!$this->submission_page) {
+    /*
+     * it's not set in the global settings, or is set to "same page", use the current 
+     * page as the submission page
+     */
+    if ($this->submission_page === false) {
       // the signup thanks page is not set up, so we submit to the page the form is on
       $this->submission_page = $_SERVER['REQUEST_URI'];
     }
@@ -326,16 +339,26 @@ class PDb_Signup extends PDb_Shortcode {
     
     if (Participants_Db::plugin_setting_is_true('show_retrieve_link')) {
       $retrieve_link = Participants_Db::plugin_setting('link_retrieval_page') !== 'none' ? get_permalink(Participants_Db::plugin_setting('link_retrieval_page')) : $_SERVER['REQUEST_URI'];
-      echo $open_tag . '<a href="' . Participants_Db::add_uri_conjunction($retrieve_link) . 'm=r">' . Participants_Db::set_filter('translate_string', $linktext) . '</a>' . $close_tag;
+      echo $open_tag . '<a href="' . Participants_Db::add_uri_conjunction($retrieve_link) . 'm=r">' . Participants_Db::apply_filters('translate_string', $linktext) . '</a>' . $close_tag;
     }
   }
 
   /**
    * prints a thank you note
+   * 
+   * @param string $template an optional override template to use
+   * @return string
    */
-  private function get_thanks_message() {
+  private function get_thanks_message( $template = '' ) 
+  {
+    $data = $this->participant_values;
+    $template = empty( $template ) ? $this->thanks_message : $template;
 
-    $this->output = empty($this->participant_values) ? '' : $this->_proc_tags($this->thanks_message);
+    // add the "record_link" tag
+    if (isset($data['private_id'])) {
+      $data['record_link'] = Participants_Db::get_record_link($data['private_id']);
+    }
+    $this->output = empty($this->participant_values) ? '' : PDb_Tag_Template::replaced_rich_text( $template, $data );
     unset($_POST);
     return $this->output;
   }
@@ -347,20 +370,42 @@ class PDb_Signup extends PDb_Shortcode {
    *
    */
   private function _send_email() {
-
-    if (filter_input(INPUT_GET, 'action') === 'update') {
-
-      if ($this->send_notification) {
-        $this->_do_update_notify();
-      }
-    } else {
-      if ($this->send_notification) {
-				$this->_do_notify();
-      }
-      if ($this->send_reciept) {
-				$this->_do_receipt();
-			}
-    }
+  	$status = $this->get_form_status();
+  	
+		switch ($status) {
+      case 'multipage-update':
+      	// this is a multipage record form
+	      if ($this->send_notification) {
+	        $this->_do_update_notify();
+	      }
+	      break;
+      case 'multipage-signup':
+				// this is a multipage signup form
+	      if ($this->send_notification) {
+					$this->_do_notify();
+	      }
+	      if ($this->send_reciept) {
+					$this->_do_receipt();
+				}
+				break;
+			case 'normal':
+			default:
+				if (filter_input(INPUT_GET, 'action', FILTER_SANITIZE_STRING) === 'update') {
+					// this is a record form using a thanks page
+		      if ($this->send_notification) {
+		        $this->_do_update_notify();
+		      }
+				} else {
+					// this is a normal signup form
+		      if ($this->send_notification) {
+						$this->_do_notify();
+		      }
+		      if ($this->send_reciept) {
+						$this->_do_receipt();
+					}
+				}
+	      break;
+		}
   }
 
   /**
@@ -384,11 +429,12 @@ class PDb_Signup extends PDb_Shortcode {
      * 
      * @return string template
      */
-    $this->_mail(
-            $this->recipient, 
-            $this->_proc_tags(Participants_Db::set_filter('receipt_email_subject', $this->receipt_subject, $this->participant_values)), 
-            Participants_Db::process_rich_text($this->_proc_tags(Participants_Db::set_filter('receipt_email_template', $this->receipt_body, $this->participant_values)))
-    );
+   PDb_Template_Email::send(array(
+       'to' => $this->recipient,
+       'subject' => Participants_Db::apply_filters('receipt_email_subject', $this->receipt_subject, $this->participant_values),
+       'template' => Participants_Db::apply_filters('receipt_email_template', $this->receipt_body, $this->participant_values),
+       'context' => __METHOD__,
+       ), $this->participant_values);
   }
 
   /**
@@ -396,53 +442,25 @@ class PDb_Signup extends PDb_Shortcode {
    */
   private function _do_notify() {
 
-    $this->_mail(
-            $this->notify_recipients, $this->_proc_tags($this->notify_subject), Participants_Db::process_rich_text($this->_proc_tags($this->notify_body))
-    );
+   PDb_Template_Email::send(array(
+       'to' => $this->notify_recipients,
+       'subject' => $this->notify_subject,
+       'template' => $this->notify_body,
+       'context' => __METHOD__,
+       ), $this->participant_values);
   }
 
   /**
-   * sends a new signup notification email to the admin
+   * sends an update notification email to the admin
    */
   private function _do_update_notify() {
 
-    $this->_mail(
-            $this->notify_recipients, 
-            $this->_proc_tags(Participants_Db::$plugin_options['record_update_email_subject']), 
-            Participants_Db::process_rich_text($this->_proc_tags(Participants_Db::$plugin_options['record_update_email_body']))
-    );
-  }
-
-  /**
-   * sends a mesage through the WP mail handler function
-   *
-   * @todo these email functions should be handled by an email class
-   *
-   * @param string $recipients comma-separated list of email addresses
-   * @param string $subject    the subject of the email
-   * @param string $body       the body of the email
-   *
-   */
-  private function _mail($recipients, $subject, $body) {
-
-    if (WP_DEBUG) error_log(__METHOD__.'
-      
-header:'.$this->email_header.'
-to:'.$recipients.' 
-subj.:'.$subject.' 
-message:
-'.$body 
-            );
-
-    $this->current_body = $body;
-
-    if (Participants_Db::plugin_setting('html_email'))
-      add_action('phpmailer_init', array($this, 'set_alt_body'));
-
-    $sent = wp_mail($recipients, $subject, $body, $this->email_header);
-
-    if (false === $sent)
-      error_log(__METHOD__ . ' sending failed for: ' . $recipients);
+   PDb_Template_Email::send(array(
+       'to' => $this->notify_recipients,
+       'subject' => $this->notify_subject,
+       'template' => $this->notify_body,
+       'context' => __METHOD__,
+       ), $this->participant_values);
   }
 
   /**
@@ -486,9 +504,18 @@ message:
    * clears the multipage form session values
    */
   function _clear_multipage_session() {
-    Participants_Db::$session->clear('pdbid');
-    Participants_Db::$session->clear('captcha_vars');
-    Participants_Db::$session->clear('captcha_result');
+    foreach ( array( 'pdbid', 'form_status', 'previous_multipage') as $value ) {
+      Participants_Db::$session->clear( $value );
+    }
+  }
+  
+  /**
+   * clears the multipage form session values
+   */
+  function _clear_captcha_session() {
+    foreach ( array( 'captcha_vars', 'captcha_result' ) as $value ) {
+      Participants_Db::$session->clear( $value );
+    }
   }
 
 }

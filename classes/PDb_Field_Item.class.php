@@ -8,7 +8,7 @@
  * @author     Roland Barker <webdeign@xnau.com>
  * @copyright  2013 xnau webdesign
  * @license    GPL2
- * @version    0.2
+ * @version    0.3
  * @link       http://xnau.com/wordpress-plugins/
  * @depends    Template_Item class
  */
@@ -80,10 +80,14 @@ class PDb_Field_Item extends PDb_Template_Item {
   
   /**
    * 
-   * @param array $field the field attributes
+   * @param array|object|string $field the field attributes or field name
    * @param mixed $id the id of the source record if available
    */
   public function __construct( $field, $id = false ) {
+    
+    if ( is_string( $field ) ) {
+      $field = (object) array( 'name' => $field );
+    }
     
     parent::__construct( $field );
     
@@ -166,6 +170,17 @@ class PDb_Field_Item extends PDb_Template_Item {
   public function has_content() {
     return ! $this->is_empty();
   }
+  
+  /**
+   * handles supplying property values
+   * 
+   * @param string  $name of the property
+   * @retrun  mixed the property value or empty string if no value defined
+   */
+  public function __get( $name )
+  {
+    return isset( $this->{$name} ) ? $this->{$name} : '';
+  }
 	
 	/**
 	 * is this the single record link?
@@ -194,8 +209,7 @@ class PDb_Field_Item extends PDb_Template_Item {
   public function output_single_record_link($template = false) {
 
     $template = $template ? $template : '<a class="single-record-link" href="%1$s" title="%2$s" >%2$s</a>';
-    $url = get_permalink(Participants_Db::$plugin_options['single_record_page']);
-    $url = Participants_Db::add_uri_conjunction($url) . 'pdb=' . $this->record_id;
+    $url = Participants_Db::single_record_url( $this->record_id );
 
     return sprintf($template, $url, (empty($this->value) ? $this->default : $this->value));
   }
@@ -255,6 +269,15 @@ class PDb_Field_Item extends PDb_Template_Item {
   public function print_element() {
 
     $this->field_class = ( $this->validation != 'no' ? "required-field" : '' ) . ( in_array($this->form_element, array('text-line', 'date', 'timestamp')) ? ' regular-text' : '' );
+    
+    /**
+     * @filter pdb-before_display_form_input
+     * 
+     * allows a callback to alter the field object before displaying a form input element
+     * 
+     * @param PDb_Form_Element this instance
+     */
+    Participants_Db::apply_filters('before_display_form_input', $this);
 
     if ($this->readonly && !in_array($this->form_element, array('captcha'))) {
 

@@ -95,7 +95,7 @@ class PDb_Template_Item {
    */
   protected function prepare_display_value( $string ) {
     
-    return Participants_Db::set_filter('translate_string', $string);
+    return Participants_Db::apply_filters('translate_string', $string);
     //str_replace(array('"',"'"), array('&quot;','&#39;'), stripslashes($string));
     //htmlspecialchars( stripslashes( $string ), ENT_QUOTES, "UTF-8", false );
   
@@ -151,14 +151,16 @@ class PDb_Template_Item {
    */
   protected function assign_props( $item, $class = __CLASS__ ) {
     
-    $class_properties = get_class_vars( $class );
+    $item = (object) $item;
+    
+    $class_properties = array_keys( get_class_vars( $class ) );
       
     if (isset(Participants_Db::$fields[$item->name]) && is_object(Participants_Db::$fields[$item->name])) {
       $field = clone Participants_Db::$fields[$item->name];
     }
     
     // grab and assign the class properties from the provided object
-    foreach( $class_properties as $property => $value ) {
+    foreach( $class_properties as $property ) {
       
       if ( isset( $item->$property ) ) {
         

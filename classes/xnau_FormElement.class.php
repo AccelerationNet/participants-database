@@ -305,6 +305,10 @@ abstract class xnau_FormElement {
           $this->_dropdown_other();
           break;
 
+        case 'multi-dropdown':
+          $this->_dropdown_multi();
+          break;
+
         case 'multi-checkbox':
           $this->_multi_checkbox();
           break;
@@ -357,6 +361,10 @@ abstract class xnau_FormElement {
 
         case 'captcha':
           $this->_captcha();
+          break;
+
+        case 'numeric':
+          $this->_numeric();
           break;
 
         default:
@@ -440,6 +448,8 @@ abstract class xnau_FormElement {
           } elseif (isset($field->module) and $field->module == 'signup') {
             $image->display_mode = $image->image_defined ? 'both' : 'none';
             $image->link = false;
+          } elseif (isset($field->module) and $field->module == 'record') {
+            $image->display_mode = 'filename';
           }
           $image->set_image_wrap();
           $return = $image->get_image_html();
@@ -485,6 +495,7 @@ abstract class xnau_FormElement {
 
     case 'multi-checkbox' :
     case 'multi-select-other' :
+    case 'multi-dropdown':
 
       $multivalues = maybe_unserialize($field->value);
       if ( is_array($multivalues) and empty( $multivalues['other'] ) ) unset($multivalues['other']);
@@ -563,6 +574,18 @@ abstract class xnau_FormElement {
     $this->_addline( $this->_input_tag() );
     
   }
+  /**
+   * builds a numeric input element
+   */
+  protected function _numeric() {
+    
+    if (is_array($this->value)) {
+      $this->value = current($this->value);
+    }
+    
+    $this->_addline( $this->_input_tag('number') );
+    
+  }
   
   /**
    * builds a date field
@@ -589,7 +612,7 @@ abstract class xnau_FormElement {
     // test for a timestamp
     if (is_int($this->value) or ((string) (int) $this->value === $this->value)) {
       $this->value = $this->format_date($this->value, true );
-    } else {
+    } elseif (strlen($this->value) > 0 ) {
       $this->value = $this->format_date(strtotime($this->value), true );
     }
     
@@ -631,6 +654,8 @@ abstract class xnau_FormElement {
    */
   protected function _password() {
     
+    $this->value = '';
+    
     $this->_addline( $this->_input_tag('password') );
     
   }
@@ -671,7 +696,7 @@ abstract class xnau_FormElement {
       $this->_addline( $this->_input_tag( 'checkbox', $checked_value, 'checked' ), 1 );
       
       if ( false !== $title ) {
-        $this->_addline( Participants_Db::set_filter('translate_string', $title), 1 );
+        $this->_addline( Participants_Db::apply_filters('translate_string', $title), 1 );
         $this->_addline( '</label>', -1 );
       }
       
@@ -703,7 +728,12 @@ abstract class xnau_FormElement {
 
     // set the ID for the select element
     $id = $this->element_id();
-    $this->attributes['id'] = (empty($id) ? $js_prefix : $id)  . '_select';
+    $this->attributes['id'] = (empty($id) ? $js_prefix . '_select' : $id) ;
+    if ( isset( $this->attributes['multiple'] ) && $this->attributes['multiple'] === true ) {
+      $this->group = true;
+      $this->name = $this->name . '[]';
+      $this->value = maybe_unserialize($this->value);
+    }
     if ($other) {
       $this->_addline('<div class="dropdown-other-control-group" >');
       $this->add_class('otherselect');
@@ -751,6 +781,18 @@ abstract class xnau_FormElement {
   protected function _dropdown_other() {
 
     $this->_dropdown( true );
+      
+  }
+
+  /**
+   * builds a dropdown-multiselect element
+   *
+   * @return string
+   */
+  protected function _dropdown_multi() {
+
+    $this->attributes['multiple'] = true;
+    $this->_dropdown();
       
   }
 
@@ -821,7 +863,7 @@ abstract class xnau_FormElement {
     
     // add the text input element
     $value = $type == 'checkbox' ? $this->value['other'] : (!in_array($this->value, $this->options) ? $this->value : '' );
-    $name = $this->name . ($type == 'checkbox' ? '[other]' : '');
+    $name = $type == 'checkbox' ? str_replace( '[]', '', $this->name ) . '[other]' : '';
     $id = $this->element_id();
     $this->attributes['id'] = $id . '_other';
     $this->_addline('<input type="text" name="' . $name . '" value="' . htmlspecialchars($value, ENT_QUOTES, 'UTF-8', false) . '" ' . $this->_attributes() . $this->_class('otherfield') . ' >');
@@ -982,11 +1024,12 @@ abstract class xnau_FormElement {
     $this->_addline($this->print_hidden_fields(array('MAX_FILE_SIZE' => $max_size, $this->name => $this->value)));
 
     if (!isset($this->attributes['readonly'])) {
-    $this->_addline($this->_input_tag('file'));
+      $this->_addline($this->_input_tag('file'));
 
-    // add the delete checkbox if there is a file defined
-    if (!empty($this->value))
+      // add the delete checkbox if there is a file defined
+      if (!empty($this->value)) {
       $this->_addline('<span class="file-delete" ><label><input type="checkbox" value="delete" name="' . $this->name . '-deletefile">' . __('delete', 'participants-database') . '</label></span>');
+    	}
     }
     
     $this->_addline('</div>');
@@ -998,8 +1041,7 @@ abstract class xnau_FormElement {
    */
   protected function _captcha() {
     
-    $captcha = new PDb_CAPTCHA($this);
-    $this->_addline($captcha->get_html());
+    $this->_addline($this->_input_tag('text'));
   }
 
   /************************ 
@@ -1074,8 +1116,6 @@ abstract class xnau_FormElement {
        
     foreach ($this->_make_assoc($this->options) as $option_key => $option_value) {
       
-      $option_key = Participants_Db::set_filter('translate_string', stripslashes($option_key));
-      
       if (($option_value === false or $option_value === 'false' or $option_value === 'optgroup') and !empty($option_key)) {
         if ($optgroup) {
           $this->_addline('</fieldset>');
@@ -1105,7 +1145,7 @@ abstract class xnau_FormElement {
       $this->_addline('<label ' . $this->_class() . ' for="' . $this->attributes['id'] . '">');
       $this->_addline(sprintf('<input type="%s" name="%s"  value="%s" %s %s />', 
               $type, 
-              'pdb-otherselector', 
+              $type === 'radio' ? $this->name : 'pdb-otherselector', 
               $otherlabel, 
               $this->_set_selected($this->options, $value, 'checked', $value === ''), 
               $this->_attributes() . $this->_class('otherselect')
@@ -1160,8 +1200,8 @@ abstract class xnau_FormElement {
         $this->_add_options_divider($title);
       } elseif($value === 'other') {
         $otherlabel = $title;
-      } elseif (!empty($value) or $value === 0) {
-        $this->_addline('<option value="' . $value . '" ' . $this->_set_selected($value, $this->value, 'selected') . ' >' . Participants_Db::set_filter('translate_string', stripslashes($title)) . '</option>', -1);
+      } elseif (strlen($value) > 0) {
+        $this->_addline('<option value="' . $value . '" ' . $this->_set_selected($value, $this->value, 'selected') . ' >' . Participants_Db::apply_filters('translate_string', stripslashes($title)) . '</option>', -1);
       }
     }
     // add the "other" option
@@ -1295,6 +1335,11 @@ abstract class xnau_FormElement {
       
     foreach ( $attributes_array as $name => $value ) {
           
+      if ( $value === false ) {
+        continue;
+      } elseif ( $value === true ) {
+        $value = $name;
+      }
       $output .= sprintf( $pattern, $name, $value );
           
     }
@@ -1462,7 +1507,7 @@ abstract class xnau_FormElement {
   /**
 	 * sets the select states for a multi-select element
 	 *
-	 * cycles through the available selects or chackboxes and sets the selected
+	 * cycles through the available selects or checkboxes and sets the selected
 	 * attribute if there is a match to an element of the array of stored values
 	 * for the field
 	 *
@@ -1490,8 +1535,7 @@ abstract class xnau_FormElement {
    */
   public static function is_assoc($array)
   {
-		
-    return ( is_array($array) && ( count($array) == 0 || 0 !== count(array_diff_key($array, array_keys(array_keys($array)))) ) );
+    return ( is_array($array) && ( array_keys($array) !== range(0, count($array) - 1 ) ) );
   }
   
   /**
@@ -1570,18 +1614,16 @@ abstract class xnau_FormElement {
   public static function is_empty($test) {
     // collapse an array
     if (is_array($test)) $test = implode('', $test);
+    
     switch (true) {
-      case $test === false:
-      case $test === true:
-      default:
-        return false;
       case $test === '0000-00-00 00:00:00':
       case strlen($test) === 0:
-//      case $test == '0': // zero shuld be a valid value generally
-//      case $test === 0:
-//      case $test === '':
       case $test === null:
         return true;
+      case is_bool( $test ):
+      case is_object( $test ):
+      default:
+        return false;
     }
   }
   /**
@@ -1598,12 +1640,15 @@ abstract class xnau_FormElement {
   /**
    * returns a MYSQL datatype appropriate to the form element type
    * 
-   * @param string $element the name of the element type
+   * @param string|array $element the (string) form element type or (array) field definition array
    * @return string the name of the MySQL datatype
    */
   public static function get_datatype($element) {
 
-    switch ($element) {
+    $form_element = is_array( $element ) ? $element['form_element'] : $element;
+    $values = isset( $element['values'] ) ? maybe_unserialize( $element['values'] ) : false;
+
+    switch ($form_element) {
       
       case 'timestamp':
         $datatype = 'TIMESTAMP';
@@ -1611,6 +1656,16 @@ abstract class xnau_FormElement {
       
       case 'date':
         $datatype = 'BIGINT';
+        break;
+      
+      case 'numeric':
+        $datatype = 'BIGINT';
+        /*
+         * we need to change the input element to include the step="any" attribute to implement floats
+         */
+//        if ( $values && stripos( current( $values ), 'float' ) !== false ) {
+//          $datatype = 'FLOAT';
+//        }
         break;
       
       case 'text-line':
@@ -1656,6 +1711,7 @@ abstract class xnau_FormElement {
          'date'               => 'Date Field', 
          'dropdown-other'     => 'Dropdown/Other', 
          'multi-checkbox'     => 'Multiselect Checkbox', 
+         'multi-dropdown'     => 'Multiselect Dropdown', 
          'select-other'       => 'Radio Buttons/Other', 
          'multi-select-other' => 'Multiselect/Other', 
          'link'               => 'Link Field', 
