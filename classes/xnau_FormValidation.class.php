@@ -394,8 +394,9 @@ class xnau_FormValidation {
 
     if (!is_string($regex) || strlen($regex) === 0)
       return false;
-    if(strpos('/#', $regex[0]) === false) $regex = '/'.$regex;
-    if(strpos('/#', substr($regex,-1)) === false) $regex = $regex.'/';
+    if(strpos('/', $regex[0]) === false) $regex = '/'.$regex;
+    if(strpos('/', substr($regex,-1)) === false) $regex = $regex.'/'; 
+    $match = preg_match($regex,'test string') !== false;
     return @preg_match($regex,'test string') !== false;
   }
 
